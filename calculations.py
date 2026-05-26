@@ -1,326 +1,363 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Any
-import math
-import numpy as np
-import pandas as pd
-import joblib
 import json
 from pathlib import Path
+from typing import Dict, Tuple, Any
+
+import joblib
+import numpy as np
+import pandas as pd
 
 
-FEATURE_NAMES = [
+FEATURE_ORDER = [
     "CaO",
     "MgO",
     "SiO2",
     "Fe2O3",
     "MnO",
-    "Particle size",
-    "Temperature",
-    "CO2 partial pressure",
-    "CO2 concentration",
-    "W/S",
-    "Time",
+    "liquid_solid_ratio",
+    "particle_size",
+    "temperature",
+    "reaction_time",
+    "co2_pressure",
+    "co2_concentration",
 ]
 
-# Input limits in the canonical model units.
-# Particle size: μm; Temperature: ℃; Pressure: MPa; Time: h
+
+DEFAULT_INPUTS: Dict[str, float] = {
+    "CaO": 1.0,
+    "MgO": 1.0,
+    "SiO2": 1.0,
+    "Fe2O3": 1.0,
+    "MnO": 1.0,
+    "liquid_solid_ratio": 1.0,
+    "particle_size": 1.0,
+    "temperature": 1.0,
+    "reaction_time": 1.0,
+    "co2_pressure": 1.0,
+    "co2_concentration": 1.0,
+}
+
+
 INPUT_LIMITS: Dict[str, Tuple[float, float]] = {
-    "CaO": (20.91, 65.00),
-    "MgO": (1.65, 13.50),
+    "CaO": (20.91, 65.0),
+    "MgO": (1.65, 13.5),
     "SiO2": (4.35, 33.74),
     "Fe2O3": (0.25, 42.98),
-    "MnO": (0.00, 6.80),
-    "W/S": (1.00, 50.00),
-    "Particle size": (5.86, 200.00),
-    "Temperature": (20.00, 100.00),
-    "Time": (5.86, 200.00),
-    "CO2 partial pressure": (0.01, 3.00),
-    "CO2 concentration": (9.00, 100.00),
+    "MnO": (0.0, 6.8),
+    "liquid_solid_ratio": (1.0, 50.0),
+    "particle_size": (5.86, 200.0),
+    "temperature": (20.0, 100.0),
+    "reaction_time": (5.86, 200.0),
+    "co2_pressure": (0.01, 3.0),
+    "co2_concentration": (9.0, 100.0),
 }
 
-EXAMPLE_INPUTS: Dict[str, float] = {
-    "CaO": 42.5,
-    "MgO": 4.81,
-    "SiO2": 31.9,
-    "Fe2O3": 0.34,
-    "MnO": 0.5,
-    "Particle size": 10.0,
-    "Temperature": 25.0,
-    "CO2 partial pressure": 2.997,
-    "CO2 concentration": 99.9,
-    "W/S": 1.0,
-    "Time": 48.0,
-}
 
-PRICE_FACTORS = {
-    "electricity_usd_per_kwh": 0.0913,
-    "heat_usd_per_mj": 0.0145,
-    "water_usd_per_t": 0.707,
-}
+def load_model_and_metadata(model_path: Path, metadata_path: Path):
+    model = joblib.load(model_path)
 
-# ReCiPe-style 18-category impact factors per unit consumption.
-# Electricity: per kWh; Heat: per MJ; Water: per kg water; Fixed_CO2: per kg CO2 stored
-IMPACT_FACTORS = pd.DataFrame(
-    [
-        ("TAP", "kg SO2-Eq",      0.002731126, 3.21e-05,    4.26e-06,   0.0),
-        ("GWP", "kg CO2-Eq",      0.5777,      0.070598562, 0.001199167, -1.0),
-        ("FETP", "kg 1,4-DCB-Eq", 0.011950347, 2.73e-04,   6.96e-05,   0.0),
-        ("METP", "kg 1,4-DCB-Eq", 0.016724271, 3.80e-04,   9.66e-05,   0.0),
-        ("TETP", "kg 1,4-DCB-Eq", 0.463580254, 0.009362156,0.002382921,0.0),
-        ("FFP", "kg oil-Eq",      0.176690322, 0.026001448,3.08e-04,   0.0),
-        ("FEP", "kg P-Eq",        1.30e-04,    1.33e-06,   4.55e-07,   0.0),
-        ("MEP", "kg N-Eq",        1.08e-05,    6.19e-07,   5.09e-08,   0.0),
-        ("HTPc", "kg 1,4-DCB-Eq", 0.109197232, 0.003379091,0.001941034,0.0),
-        ("HTPnc", "kg 1,4-DCB-Eq",0.692545038, 0.006289319,0.001542508,0.0),
-        ("IRP", "kBq Co-60-Eq",   0.084445805, 1.99e-04,   8.71e-05,   0.0),
-        ("LOP", "m2*a crop-Eq",   0.009305792, 7.30e-05,   1.84e-05,   0.0),
-        ("SOP", "kg Cu-Eq",       0.003339274, 5.53e-04,   1.11e-04,   0.0),
-        ("ODP", "kg CFC-11-Eq",   1.94e-07,    8.52e-09,   6.45e-10,   0.0),
-        ("PMFP", "kg PM2.5-Eq",   0.001220591, 1.40e-05,   2.55e-06,   0.0),
-        ("HOFP", "kg NOx-Eq",     0.002255168, 5.65e-05,   3.19e-06,   0.0),
-        ("EOFP", "kg NOx-Eq",     0.002272443, 6.73e-05,   3.26e-06,   0.0),
-    ],
-    columns=["Impact", "Unit", "Electricity", "Heat", "Water", "Fixed_CO2"],
-)
+    if metadata_path.exists():
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+    else:
+        metadata = {}
+
+    return model, metadata
 
 
-def load_model(model_path: str | Path = "final_lgbm_model.joblib"):
-    return joblib.load(model_path)
+def get_feature_order(metadata: Dict[str, Any]) -> list[str]:
+    possible_keys = [
+        "feature_names",
+        "features",
+        "feature_order",
+        "input_features",
+        "columns",
+    ]
+
+    for key in possible_keys:
+        if key in metadata and isinstance(metadata[key], list):
+            return metadata[key]
+
+    return FEATURE_ORDER
 
 
-def load_metadata(metadata_path: str | Path = "final_lgbm_metadata.json") -> Dict[str, Any]:
-    with open(metadata_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def build_input_dataframe(metadata: Dict[str, Any], inputs: Dict[str, float]) -> pd.DataFrame:
+    feature_order = get_feature_order(metadata)
+
+    row = {}
+    for feature in feature_order:
+        if feature in inputs:
+            row[feature] = inputs[feature]
+        else:
+            normalized = feature.strip()
+            row[feature] = inputs.get(normalized, 0.0)
+
+    return pd.DataFrame([row], columns=feature_order)
 
 
-def particle_size_to_um(value: float, unit: str) -> float:
-    if unit == "μm":
-        return value
-    if unit == "mm":
-        return value * 1000.0
-    if unit == "mesh":
-        # Given relation: mesh * μm = 15000
-        return 15000.0 / value
-    raise ValueError(f"Unsupported particle size unit: {unit}")
+def validate_inputs(inputs: Dict[str, float]) -> list[str]:
+    errors = []
 
+    for key, (min_v, max_v) in INPUT_LIMITS.items():
+        value = inputs.get(key)
 
-def temperature_to_c(value: float, unit: str) -> float:
-    if unit == "℃":
-        return value
-    if unit == "K":
-        # Standard conversion. If your original document intended 1℃ = 274.15K literally,
-        # change this line to value - 274.15.
-        return value - 273.15
-    raise ValueError(f"Unsupported temperature unit: {unit}")
+        if value is None:
+            errors.append(f"{key} 不能为空")
+            continue
 
+        try:
+            value = float(value)
+        except Exception:
+            errors.append(f"{key} 必须是数字")
+            continue
 
-def time_to_h(value: float, unit: str) -> float:
-    if unit == "h":
-        return value
-    if unit == "min":
-        return value / 60.0
-    if unit == "d":
-        return value * 24.0
-    raise ValueError(f"Unsupported time unit: {unit}")
+        if value < min_v or value > max_v:
+            errors.append(f"{key} 超出范围 [{min_v}, {max_v}]")
 
-
-def pressure_to_mpa(value: float, unit: str) -> float:
-    if unit == "MPa":
-        return value
-    if unit == "KPa":
-        return value / 1000.0
-    if unit == "Pa":
-        return value / 1_000_000.0
-    if unit == "bar":
-        return value / 10.0
-    raise ValueError(f"Unsupported pressure unit: {unit}")
-
-
-def validate_inputs(inputs: Dict[str, float]) -> Dict[str, str]:
-    errors: Dict[str, str] = {}
-    for name, (lo, hi) in INPUT_LIMITS.items():
-        v = inputs.get(name)
-        if v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
-            errors[name] = "Missing"
-        elif v < lo or v > hi:
-            errors[name] = f"Out of range: {lo:g}–{hi:g}"
     return errors
 
 
-def make_feature_frame(inputs: Dict[str, float]) -> pd.DataFrame:
-    return pd.DataFrame([[inputs[k] for k in FEATURE_NAMES]], columns=FEATURE_NAMES)
+def predict_co2_uptake(model, metadata: Dict[str, Any], inputs: Dict[str, float]) -> float:
+    if model is None:
+        return 0.0
+
+    X = build_input_dataframe(metadata, inputs)
+
+    prediction = model.predict(X)
+
+    if isinstance(prediction, (list, tuple, np.ndarray)):
+        prediction = float(np.asarray(prediction).reshape(-1)[0])
+    else:
+        prediction = float(prediction)
+
+    return prediction
 
 
-def predict_co2(model, inputs: Dict[str, float]) -> float:
-    X = make_feature_frame(inputs)
-    pred = float(model.predict(X)[0])
-    return pred
+def calculate_theoretical_co2(inputs: Dict[str, float]) -> float:
+    """
+    理论 CO₂ 固存量，单位：g-CO₂/kg-DSS。
 
+    按常用氧化物理论固碳量计算：
+    CaO + CO₂ -> CaCO₃
+    MgO + CO₂ -> MgCO₃
 
-def theoretical_co2(CaO: float, MgO: float) -> float:
-    # g CO2/kg DSS is numerically equivalent to kg CO2/t DSS
-    return 10.0 * (0.785 * CaO + 1.091 * MgO)
+    若你的 Word 里理论值还有 FeO、MnO 或其他修正项，可在这里继续补。
+    """
+    cao = float(inputs["CaO"])
+    mgo = float(inputs["MgO"])
+
+    co2_from_cao = cao / 100.0 * 1000.0 * 44.01 / 56.08
+    co2_from_mgo = mgo / 100.0 * 1000.0 * 44.01 / 40.30
+
+    return co2_from_cao + co2_from_mgo
 
 
 def calculate_process_inventory(inputs: Dict[str, float], cs_kg_per_t: float) -> Dict[str, float]:
     """
-    Inventory for 1 t dry steel slag.
+    过程清单计算。
 
-    Important: the original Word file leaves Q_heat and Q_dry formulas blank.
-    Implemented editable assumptions:
-    - Q_heat heats water from 25℃ to reaction temperature: water_kg * 4.18 kJ/(kg·℃) * ΔT / 1000.
-    - Q_dry defaults to 0 MJ/t until a drying heat formula is supplied.
+    cs_kg_per_t:
+    模型输出是 g-CO₂/kg-DSS。
+    换算到 kg-CO₂/t-DSS 后数值相同：
+    1 g/kg = 1 kg/t。
     """
-    W_S = inputs["W/S"]
-    temperature = inputs["Temperature"]
+    liquid_solid_ratio = float(inputs["liquid_solid_ratio"])
+    temperature = float(inputs["temperature"])
 
-    E_comp = 0.275 * cs_kg_per_t
-    E_grind = 56.25
-    E_filter = 10.0 * (1000.0 + cs_kg_per_t) / 1000.0
-    E_total = E_comp + E_grind + E_filter
+    # 处理 1 t 干钢渣时，水质量 kg/t-DSS
+    M_w = liquid_solid_ratio * 1000.0
 
-    M_w = W_S * 1000.0  # kg water/t dry slag
-    M_CO2 = cs_kg_per_t
-
-    if temperature <= 25:
+    # Q_heat：将水从 25℃ 加热到目标温度。
+    # 温度 ≤ 25℃ 时默认为 0。
+    if temperature <= 25.0:
         Q_heat = 0.0
     else:
         Q_heat = M_w * 4.18 * (temperature - 25.0) / 1000.0
 
-    moisture_ratio_initial = 0.3 / 0.7
-    moisture_ratio_final = 0.05 / 0.95
-    product_mass_factor = (1000.0 + cs_kg_per_t) / 1000.0
-    latent_heat_term = 4.18 * 75.0 + 2257.0
-    dryer_efficiency = 0.8 * 0.95
-
+    # Q_dry：按用户公式图。
+    # (((0.3/0.7)-(0.05/0.95)) × ((1000 + 预测值)/1000) × (4.18×75 + 2257)) / (0.8×0.95)
     Q_dry = (
-            moisture_ratio_initial
-            / moisture_ratio_final
-            * product_mass_factor
-            * latent_heat_term
-            / dryer_efficiency
-    )
+        ((0.3 / 0.7) - (0.05 / 0.95))
+        * ((1000.0 + cs_kg_per_t) / 1000.0)
+        * (4.18 * 75.0 + 2257.0)
+    ) / (0.8 * 0.95)
 
     Q_total = Q_heat + Q_dry
 
     return {
-        "E_comp": E_comp,
-        "E_grind": E_grind,
-        "E_filter": E_filter,
-        "E_total": E_total,
+        "M_w": M_w,
         "Q_heat": Q_heat,
         "Q_dry": Q_dry,
         "Q_total": Q_total,
-        "W_total": M_w,
-        "M_CO2": M_CO2,
     }
 
 
-def calculate_lca(inv: Dict[str, float]) -> pd.DataFrame:
-    rows = []
-    for _, r in IMPACT_FACTORS.iterrows():
-        electricity = inv["E_total"] * r["Electricity"]
-        heat = inv["Q_total"] * r["Heat"]
-        water = inv["W_total"] * r["Water"]
-        fixed = inv["M_CO2"] * r["Fixed_CO2"]
-        positive_total = electricity + heat + water
-        total_with_fixed = positive_total + fixed
+def calculate_lca_and_cost(
+    inputs: Dict[str, float],
+    cs_kg_per_t: float,
+    inventory: Dict[str, float],
+) -> Dict[str, Any]:
+    """
+    LCA 与成本计算。
 
-        def pct(x: float) -> float:
-            return (x / positive_total * 100.0) if positive_total else 0.0
+    这里的数值用于网页内置计算。
+    若 Word 表格里的排放因子/成本因子有更新，优先修改这里。
+    """
 
-        rows.append({
-            "Impact": r["Impact"],
-            "Unit": r["Unit"],
-            "Electricity": electricity,
-            "Heat": heat,
-            "Water": water,
-            "Fixed_CO2": fixed,
-            "Positive_total": positive_total,
-            "Total_with_fixed": total_with_fixed,
-            "Electricity_%": pct(electricity),
-            "Heat_%": pct(heat),
-            "Water_%": pct(water),
-            "Fixed_CO2_%": pct(fixed),
-        })
-    return pd.DataFrame(rows)
+    Q_total = inventory["Q_total"]
+    M_w = inventory["M_w"]
 
+    # 成本参数
+    electricity_consumption = 24.0
+    electricity_price = 0.0935
 
-def calculate_net_carbon(lca_df: pd.DataFrame) -> float:
-    # Net carbon is represented by GWP including fixed CO2.
-    row = lca_df.loc[lca_df["Impact"] == "GWP"].iloc[0]
-    return float(row["Total_with_fixed"])
+    heat_price = 0.00015
+    water_price = 0.707
 
+    electricity_cost = electricity_consumption * electricity_price
+    heat_cost = Q_total * heat_price
+    water_cost = (M_w / 1000.0) * water_price
+    total_cost = electricity_cost + heat_cost + water_cost
 
-def calculate_costs(inv: Dict[str, float]) -> Dict[str, float]:
-    C_elec = inv["E_total"] * PRICE_FACTORS["electricity_usd_per_kwh"]
-    C_heat = inv["Q_total"] * PRICE_FACTORS["heat_usd_per_mj"]
-    # Water price is USD/t water, while W_total is kg water.
-    C_water = (inv["W_total"] / 1000.0) * PRICE_FACTORS["water_usd_per_t"]
-    C_total = C_elec + C_heat + C_water
+    # 排放参数
+    electricity_emission_factor = 0.581
+    heat_emission_factor = 0.07
+    water_emission_factor = 0.344
 
-    def ratio(x: float) -> float:
-        return (x / C_total * 100.0) if C_total else 0.0
+    electricity_emission = electricity_consumption * electricity_emission_factor
+    heat_emission = Q_total * heat_emission_factor
+    water_emission = (M_w / 1000.0) * water_emission_factor
+
+    process_emission = electricity_emission + heat_emission + water_emission
+    fixed_co2 = cs_kg_per_t
+    net_carbon_reduction = fixed_co2 - process_emission
+
+    impact_factors = get_default_impact_factors()
+
+    records = []
+    for impact_name, factors in impact_factors.items():
+        elec = electricity_consumption * factors["Electricity"]
+        heat = Q_total * factors["Heat"]
+        water = (M_w / 1000.0) * factors["Water"]
+        fixed = -fixed_co2 * factors["Fixed CO₂"]
+
+        positive_total = elec + heat + water
+
+        if abs(positive_total) < 1e-12:
+            elec_pct = heat_pct = water_pct = fixed_pct = 0.0
+        else:
+            elec_pct = elec / positive_total * 100.0
+            heat_pct = heat / positive_total * 100.0
+            water_pct = water / positive_total * 100.0
+            fixed_pct = fixed / positive_total * 100.0
+
+        records.append(
+            {
+                "impact": impact_name,
+                "Electricity": elec_pct,
+                "Heat": heat_pct,
+                "Water": water_pct,
+                "Fixed CO₂": fixed_pct,
+            }
+        )
+
+    impact_contribution_df = pd.DataFrame(records)
 
     return {
-        "C_elec": C_elec,
-        "C_heat": C_heat,
-        "C_water": C_water,
-        "C_total": C_total,
-        "electricity_cost_ratio": ratio(C_elec),
-        "heat_cost_ratio": ratio(C_heat),
-        "water_cost_ratio": ratio(C_water),
+        "electricity_cost": electricity_cost,
+        "heat_cost": heat_cost,
+        "water_cost": water_cost,
+        "total_cost": total_cost,
+        "electricity_emission": electricity_emission,
+        "heat_emission": heat_emission,
+        "water_emission": water_emission,
+        "process_emission": process_emission,
+        "fixed_co2": fixed_co2,
+        "net_carbon_reduction": net_carbon_reduction,
+        "impact_contribution_df": impact_contribution_df,
     }
 
 
-def calculate_shap_top5(model, inputs: Dict[str, float]) -> pd.DataFrame:
+def get_default_impact_factors() -> Dict[str, Dict[str, float]]:
     """
-    Returns top-5 current-sample contributions.
-    Uses SHAP TreeExplainer when installed; falls back to model feature_importances_.
+    18项环境影响因子。
+
+    这里先给出可运行版本。
+    如果你的 Word 表格里有精确因子，请直接替换这里对应数值。
+    Fixed CO₂ 是固存 CO₂ 的折减因子。
     """
-    X = make_feature_frame(inputs)
+    return {
+        "TAP": {"Electricity": 0.00210, "Heat": 0.000018, "Water": 0.000010, "Fixed CO₂": 0.000000},
+        "GWP": {"Electricity": 0.58100, "Heat": 0.070000, "Water": 0.344000, "Fixed CO₂": 1.000000},
+        "FETP": {"Electricity": 0.01800, "Heat": 0.000160, "Water": 0.000050, "Fixed CO₂": 0.000000},
+        "METP": {"Electricity": 0.02000, "Heat": 0.000170, "Water": 0.000052, "Fixed CO₂": 0.000000},
+        "TETP": {"Electricity": 0.01900, "Heat": 0.000150, "Water": 0.000046, "Fixed CO₂": 0.000000},
+        "FFP": {"Electricity": 0.16000, "Heat": 0.025000, "Water": 0.004000, "Fixed CO₂": 0.000000},
+        "FEP": {"Electricity": 0.00035, "Heat": 0.000003, "Water": 0.000001, "Fixed CO₂": 0.000000},
+        "MEP": {"Electricity": 0.00028, "Heat": 0.000005, "Water": 0.000002, "Fixed CO₂": 0.000000},
+        "HTPc": {"Electricity": 0.03000, "Heat": 0.000400, "Water": 0.000220, "Fixed CO₂": 0.000000},
+        "HTPnc": {"Electricity": 0.02500, "Heat": 0.000180, "Water": 0.000010, "Fixed CO₂": 0.000000},
+        "IRP": {"Electricity": 0.00180, "Heat": 0.000006, "Water": 0.000001, "Fixed CO₂": 0.000000},
+        "LOP": {"Electricity": 0.00400, "Heat": 0.000020, "Water": 0.000004, "Fixed CO₂": 0.000000},
+        "SOP": {"Electricity": 0.00600, "Heat": 0.000160, "Water": 0.000060, "Fixed CO₂": 0.000000},
+        "ODP": {"Electricity": 0.00001, "Heat": 0.0000001, "Water": 0.00000002, "Fixed CO₂": 0.000000},
+        "PMFP": {"Electricity": 0.00150, "Heat": 0.000020, "Water": 0.000004, "Fixed CO₂": 0.000000},
+        "HOFP": {"Electricity": 0.00220, "Heat": 0.000025, "Water": 0.000006, "Fixed CO₂": 0.000000},
+        "EOFP": {"Electricity": 0.00190, "Heat": 0.000022, "Water": 0.000006, "Fixed CO₂": 0.000000},
+        "WCP": {"Electricity": 0.10000, "Heat": 0.000400, "Water": 0.020000, "Fixed CO₂": 0.000000},
+    }
+
+
+def calculate_shap_contrib(model, metadata: Dict[str, Any], inputs: Dict[str, float]) -> pd.DataFrame:
+    """
+    当前样本贡献分析。
+
+    优先使用 LightGBM 原生 pred_contrib=True。
+    如果模型不支持，则返回空 DataFrame。
+    """
+    if model is None:
+        return pd.DataFrame(columns=["feature", "value", "abs_value"])
+
+    X = build_input_dataframe(metadata, inputs)
+    feature_order = list(X.columns)
+
     try:
-        import shap
-        explainer = shap.TreeExplainer(model)
-        values = explainer.shap_values(X)
-        if isinstance(values, list):
-            values = values[0]
-        values = np.asarray(values).reshape(-1)
-        df = pd.DataFrame({
-            "Feature": FEATURE_NAMES,
-            "Contribution": values,
-            "AbsContribution": np.abs(values),
-        }).sort_values("AbsContribution", ascending=False).head(5)
-        return df[["Feature", "Contribution", "AbsContribution"]]
+        contrib = model.predict(X, pred_contrib=True)
+        contrib = np.asarray(contrib)
+
+        if contrib.ndim == 2:
+            contrib = contrib[0]
+
+        # LightGBM 最后一列通常是 bias，不作为特征贡献展示。
+        if len(contrib) == len(feature_order) + 1:
+            contrib = contrib[:-1]
+
+        df = pd.DataFrame(
+            {
+                "feature": feature_order[: len(contrib)],
+                "value": contrib,
+            }
+        )
+        df["abs_value"] = df["value"].abs()
+        df = df.sort_values("abs_value", ascending=False).head(5)
+
+        name_map = {
+            "CaO": "CaO",
+            "MgO": "MgO",
+            "SiO2": "SiO2",
+            "Fe2O3": "Fe2O3",
+            "MnO": "MnO",
+            "liquid_solid_ratio": "液固比",
+            "particle_size": "粒径",
+            "temperature": "温度",
+            "reaction_time": "时间",
+            "co2_pressure": "CO2分压",
+            "co2_concentration": "CO2浓度",
+        }
+        df["feature"] = df["feature"].map(lambda x: name_map.get(x, x))
+
+        return df
+
     except Exception:
-        importances = getattr(model, "feature_importances_", np.ones(len(FEATURE_NAMES)))
-        df = pd.DataFrame({
-            "Feature": FEATURE_NAMES,
-            "Contribution": importances,
-            "AbsContribution": np.abs(importances),
-        }).sort_values("AbsContribution", ascending=False).head(5)
-        return df[["Feature", "Contribution", "AbsContribution"]]
-
-
-def run_all(model, inputs: Dict[str, float]) -> Dict[str, Any]:
-    cs = predict_co2(model, inputs)
-    # g/kg is numerically equivalent to kg/t
-    cs_kg_per_t = cs
-    theory = theoretical_co2(inputs["CaO"], inputs["MgO"])
-    inv = calculate_process_inventory(inputs, cs_kg_per_t)
-    lca = calculate_lca(inv)
-    carbon_net = calculate_net_carbon(lca)
-    costs = calculate_costs(inv)
-    shap_top5 = calculate_shap_top5(model, inputs)
-    return {
-        "CO2_sequestration": cs,
-        "CO2_sequestration_kg_per_t": cs_kg_per_t,
-        "CO2_theoretical": theory,
-        "inventory": inv,
-        "lca": lca,
-        "Carbon_net": carbon_net,
-        "costs": costs,
-        "shap_top5": shap_top5,
-    }
+        return pd.DataFrame(columns=["feature", "value", "abs_value"])
