@@ -31,7 +31,7 @@ from ui_style import (
 
 
 st.set_page_config(
-    page_title="SS-CSP | CO₂ Calculator",
+    page_title="SSCSP",
     layout="wide",
     initial_sidebar_state="expanded",
 )
