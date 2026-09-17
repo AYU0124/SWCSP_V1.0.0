@@ -25,7 +25,7 @@ LCA_COLOR_MAP = {
 
 TEXT = {
     "zh_CN": {
-        "title": "基于 LGBM 的钢渣 CO₂ 固存量网页预测计算器",
+        "title": "钢渣浆体碳化智能预测与环境经济决策支持软件",
         "language": "简体中文",
         "input_params": "输入参数",
         "composition": "组分特征",
@@ -143,7 +143,7 @@ TEXT = {
         },
     },
     "zh_TW": {
-        "title": "基於 LGBM 的鋼渣 CO₂ 固存量網頁預測計算器",
+        "title": "鋼渣漿體碳化智能預測與環境經濟決策支援軟體",
         "language": "繁體中文",
         "input_params": "輸入參數",
         "composition": "組分特徵",
@@ -261,7 +261,7 @@ TEXT = {
         },
     },
     "en": {
-        "title": "A Web-Based Calculator for Predicting CO₂ Sequestration by Steel Slag Utilizing LGBM",
+        "title": "Intelligent Prediction and Environmental–Economic Decision Support Software for Steel Slag Slurry Carbonation",
         "language": "English",
         "input_params": "Input Parameters",
         "composition": "Composition Features",
