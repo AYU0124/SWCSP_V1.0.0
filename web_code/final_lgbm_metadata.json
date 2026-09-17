@@ -1,6 +1,5 @@
 {
   "model_type": "LGBMRegressor",
-  "source_data_path": "C:\\Users\\AYU\\Desktop\\SS-ML.xlsx",
   "n_samples": 429,
   "n_features": 11,
   "feature_names": [
@@ -38,11 +37,5 @@
     "max": 564.8,
     "mean": 165.30741410708978,
     "std": 117.26612649835991
-  },
-  "recommended_usage": {
-    "prediction_input_must_match_feature_order": true,
-    "candidate_generation_supported": true,
-    "candidate_cv_stability_supported": true,
-    "web_deployment_supported": true
   }
 }
