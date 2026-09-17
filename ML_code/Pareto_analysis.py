@@ -1572,7 +1572,7 @@ def prepare_analysis_data(df_raw: pd.DataFrame) -> pd.DataFrame:
     analysis = analysis.dropna(
         subset=[COST_KEY, CENET_KEY, UPTAKE_KEY, WS_KEY, TIME_KEY]
     ).copy()
-    analysis = analysis[(analysis[TIME_KEY] > 0) & ((1.0 + analysis[WS_KEY]) > 0)].copy()
+    analysis = analysis[(analysis[TIME_KEY] > 0) & ((analysis[WS_KEY]) > 1)].copy()
 
     if analysis.empty:
         raise ValueError("No valid rows remain after loading Pareto objectives.")
