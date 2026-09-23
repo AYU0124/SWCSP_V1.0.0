@@ -2,7 +2,12 @@
 
 This project focuses on the application of explainable machine learning to predict the CO₂ sequestration capacity of steel slag under different material compositions and carbonation conditions, and can serve as a reference for similar studies on steel-slag carbonation analysis.
 
-An interactive web application named **SSCSP** was also developed to make the trained model more accessible. Users can enter steel slag composition and process parameters to obtain CO₂ sequestration predictions, examine current sample feature contributions, and evaluate the associated life-cycle impacts and process costs.
+# SWCSP
+
+**Industrial Solid Waste Mineralization CO₂ Sequestration Prediction and
+Environmental–Economic Benefit Assessment Software**
+
+SWCSP (Solid Waste Carbon Sequestration Prediction) is a web-based analysis software for mineral carbonation. The V1.0.0 embedded prediction model was trained using a curated steel slag slurry carbonation dataset. Users can input material composition and carbonation process parameters to obtain CO₂ sequestration predictions, examine feature contributions, and evaluate environmental impacts and process costs.
 
 **Web application:** [https://sscsp-v1-1.streamlit.app](https://sscsp-v1-1.streamlit.app)
 
