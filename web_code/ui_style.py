@@ -261,7 +261,7 @@ TEXT = {
         },
     },
     "en": {
-        "title": "Industrial Solid Waste Mineralization CO₂ Sequestration Prediction and Environmental–Economic Benefit Assessment Software",
+        "title": "Industrial Solid Waste Mineralization CO₂ Sequestration Prediction and Environmental and Economic Benefit Assessment Software",
         "language": "English",
         "input_params": "Input Parameters",
         "composition": "Composition Features",
