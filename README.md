@@ -9,6 +9,6 @@ Environmental–Economic Benefit Assessment Software**
 
 SWCSP (Solid Waste Carbon Sequestration Prediction) is a web-based analysis software for mineral carbonation. The V1.0.0 embedded prediction model was trained using a curated steel slag slurry carbonation dataset. Users can input material composition and carbonation process parameters to obtain CO₂ sequestration predictions, examine feature contributions, and evaluate environmental impacts and process costs.
 
-**Web application:** [https://sscsp-v1-1.streamlit.app](https://sscsp-v1-1.streamlit.app)
+**Web application:** (https://swcsp-web.streamlit.app/)
 
 *The project was developed by Southeast University.*
